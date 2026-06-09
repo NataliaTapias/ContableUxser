@@ -125,7 +125,7 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     try
     {
         var connStr = builder.Configuration.GetConnectionString("DefaultConnection");
-        using var conn = new NpgsqlConnection { ConnectionString = connStr, Pooling = false };
+        using var conn = new NpgsqlConnection($"{connStr}; Pooling=false");
         await conn.OpenAsync();
         using var cmd = conn.CreateCommand();
 
