@@ -158,40 +158,52 @@ await app.RunAsync();
 
 static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwordHasher)
 {
-    if (await db.Empresas.AnyAsync()) return;
-
-    var empresa = new Empresa
+    if (!await db.Empresas.AnyAsync())
     {
-        Nombre = "Demo Empresa",
-        NIT = "900000000-1",
-        Activo = true
-    };
-    db.Empresas.Add(empresa);
-    await db.SaveChangesAsync();
+        var empresa = new Empresa
+        {
+            Nombre = "Demo Empresa",
+            NIT = "900000000-1",
+            Activo = true
+        };
+        db.Empresas.Add(empresa);
+        await db.SaveChangesAsync();
 
-    var admin = new Usuario
-    {
-        EmpresaId = empresa.Id,
-        Nombre = "Admin Demo",
-        Email = "admin@demo.com",
-        PasswordHash = passwordHasher.Hash("admin123"),
-        Rol = RolUsuario.Administrador,
-        Activo = true
-    };
-    db.Usuarios.Add(admin);
-    await db.SaveChangesAsync();
+        var admin = new Usuario
+        {
+            EmpresaId = empresa.Id,
+            Nombre = "Admin Demo",
+            Email = "admin@demo.com",
+            PasswordHash = passwordHasher.Hash("admin123"),
+            Rol = RolUsuario.Administrador,
+            Activo = true
+        };
+        db.Usuarios.Add(admin);
+        await db.SaveChangesAsync();
 
-    var productos = new[]
+        var productos = new[]
+        {
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010001", Nombre = "Arroz Diana x1kg", CostoPromedio = 2800m, PrecioVenta = 3200m, StockActual = 50m, StockMinimo = 10m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010002", Nombre = "Aceite Gourmet x900ml", CostoPromedio = 8500m, PrecioVenta = 9800m, StockActual = 20m, StockMinimo = 5m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010003", Nombre = "Pan Bimbo Grande", CostoPromedio = 4200m, PrecioVenta = 5200m, StockActual = 15m, StockMinimo = 8m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010004", Nombre = "Leche Colanta x1L", CostoPromedio = 3100m, PrecioVenta = 3800m, StockActual = 30m, StockMinimo = 12m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010005", Nombre = "Huevos Santa Reyes x30", CostoPromedio = 12000m, PrecioVenta = 14500m, StockActual = 10m, StockMinimo = 3m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010006", Nombre = "Jabón Ariel x500g", CostoPromedio = 4500m, PrecioVenta = 5600m, StockActual = 25m, StockMinimo = 6m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010007", Nombre = "Coca-Cola x2L", CostoPromedio = 4200m, PrecioVenta = 5000m, StockActual = 40m, StockMinimo = 15m },
+            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010008", Nombre = "Papel Higiénico x4", CostoPromedio = 3800m, PrecioVenta = 4800m, StockActual = 18m, StockMinimo = 5m },
+        };
+        db.Productos.AddRange(productos);
+        await db.SaveChangesAsync();
+        return;
+    }
+
+    // Fix existing users with empty PasswordHash
+    var admins = await db.Usuarios.IgnoreQueryFilters()
+        .Where(u => u.Email == "admin@demo.com" && (u.PasswordHash == "" || u.PasswordHash == null))
+        .ToListAsync();
+    foreach (var u in admins)
     {
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010001", Nombre = "Arroz Diana x1kg", CostoPromedio = 2800m, PrecioVenta = 3200m, StockActual = 50m, StockMinimo = 10m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010002", Nombre = "Aceite Gourmet x900ml", CostoPromedio = 8500m, PrecioVenta = 9800m, StockActual = 20m, StockMinimo = 5m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010003", Nombre = "Pan Bimbo Grande", CostoPromedio = 4200m, PrecioVenta = 5200m, StockActual = 15m, StockMinimo = 8m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010004", Nombre = "Leche Colanta x1L", CostoPromedio = 3100m, PrecioVenta = 3800m, StockActual = 30m, StockMinimo = 12m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010005", Nombre = "Huevos Santa Reyes x30", CostoPromedio = 12000m, PrecioVenta = 14500m, StockActual = 10m, StockMinimo = 3m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010006", Nombre = "Jabón Ariel x500g", CostoPromedio = 4500m, PrecioVenta = 5600m, StockActual = 25m, StockMinimo = 6m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010007", Nombre = "Coca-Cola x2L", CostoPromedio = 4200m, PrecioVenta = 5000m, StockActual = 40m, StockMinimo = 15m },
-        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010008", Nombre = "Papel Higiénico x4", CostoPromedio = 3800m, PrecioVenta = 4800m, StockActual = 18m, StockMinimo = 5m },
-    };
-    db.Productos.AddRange(productos);
+        u.PasswordHash = passwordHasher.Hash("admin123");
+    }
     await db.SaveChangesAsync();
 }
