@@ -140,10 +140,10 @@ static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwor
     var adminPasswordHash = passwordHasher.Hash("admin123");
 
     using var tx = await db.Database.BeginTransactionAsync();
-    db.Database.ExecuteSqlRaw(
+    await db.Database.ExecuteSqlRawAsync(
         "INSERT INTO \"Empresas\" (\"Id\", \"Nombre\", \"NIT\", \"Activo\", \"FechaRegistro\") VALUES ({0}, {1}, {2}, TRUE, NOW())",
         empresaId, "Demo Empresa", "900000000-1");
-    db.Database.ExecuteSqlRaw(
+    await db.Database.ExecuteSqlRawAsync(
         "INSERT INTO \"Usuarios\" (\"Id\", \"EmpresaId\", \"Nombre\", \"Email\", \"PasswordHash\", \"Rol\", \"Activo\", \"FechaRegistro\") VALUES ({0}, {1}, {2}, {3}, {4}, {5}, TRUE, NOW())",
         adminId, empresaId, "Admin Demo", "admin@demo.com", adminPasswordHash, "Administrador");
 
@@ -161,7 +161,7 @@ static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwor
 
     foreach (var (codigo, nombre, costo, precio, stock, min) in productos)
     {
-        db.Database.ExecuteSqlRaw(
+        await db.Database.ExecuteSqlRawAsync(
             "INSERT INTO \"Productos\" (\"Id\", \"EmpresaId\", \"CodigoBarras\", \"Nombre\", \"CostoPromedio\", \"PrecioVenta\", \"StockActual\", \"StockMinimo\", \"FechaRegistro\") VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, NOW())",
             Guid.NewGuid(), empresaId, codigo, nombre, costo, precio, stock, min);
     }
