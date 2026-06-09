@@ -1,0 +1,40 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+*.log
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+
+## Visual Studio Code
+.vscode/
+
+## NuGet Packages
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Secrets
+appsettings.Local.json
+appsettings.*.Local.json
+contable_uxser_app/.env
+src/ContableUxser.Api/appsettings.Production.json
+
+## Flutter SDK (local, no incluir en repo)
+sdkFlutter/
+
+## Build artifacts
+*.log
+api_error.txt
+api_output.txt

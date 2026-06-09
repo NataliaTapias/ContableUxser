@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: contableuxser-api
+    runtime: image
+    repo: https://github.com/tu-usuario/ContableUxser
+    branch: main
+    plan: free
+    dockerfilePath: ./src/Dockerfile
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Secret
+        sync: false
+      - key: Jwt__Issuer
+        value: ContableUxser
+      - key: Jwt__Audience
+        value: ContableUxserApp
+      - key: Jwt__ExpirationHours
+        value: 168
+      - key: RUN_MIGRATIONS
+        value: "true"
