@@ -115,15 +115,15 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 {
     if (!builder.Configuration.GetValue<bool>("RUN_MIGRATIONS")) return;
 
-    await Task.Delay(2000);
-    Console.WriteLine("[INFO] Starting database migration...");
+    await Task.Delay(1000);
+    Console.WriteLine("[INFO] Starting database setup (EnsureCreated + seed)...");
 
     try
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await dbContext.Database.MigrateAsync(CancellationToken.None);
-        Console.WriteLine("[INFO] Migration completed.");
+        var created = await dbContext.Database.EnsureCreatedAsync();
+        Console.WriteLine($"[INFO] Database created: {created}");
 
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         await SeedDataAsync(dbContext, passwordHasher);
@@ -131,8 +131,7 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[WARN] Migration failed: {ex.Message}");
-        Console.WriteLine($"[WARN] Stack: {ex.StackTrace}");
+        Console.WriteLine($"[WARN] DB setup failed: {ex.Message}");
     }
 });
 
