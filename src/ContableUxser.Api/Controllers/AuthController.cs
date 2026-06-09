@@ -124,9 +124,17 @@ public class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("debug")]
-    public IActionResult Debug()
+    public async Task<IActionResult> Debug()
     {
-        return Ok(new { message = "debug works" });
+        try
+        {
+            var userCount = await _context.Usuarios.IgnoreQueryFilters().CountAsync();
+            return Ok(new { userCount });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { error = ex.Message });
+        }
     }
 
     [AllowAnonymous]
