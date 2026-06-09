@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -123,21 +124,102 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 
     try
     {
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Database.EnsureCreatedAsync();
+        var connStr = builder.Configuration.GetConnectionString("DefaultConnection");
+        using var conn = new NpgsqlConnection { ConnectionString = connStr, Pooling = false };
+        await conn.OpenAsync();
+        using var cmd = conn.CreateCommand();
 
-        // Fix missing PasswordHash column from failed migration
-        try
+        // Ensure tables exist
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS ""Empresas"" (
+                ""Id"" UUID PRIMARY KEY, ""Nombre"" VARCHAR(200) NOT NULL, ""NIT"" VARCHAR(50) NOT NULL,
+                ""Activo"" BOOLEAN DEFAULT TRUE, ""FechaRegistro"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""FechaActualizacion"" TIMESTAMPTZ);
+            CREATE TABLE IF NOT EXISTS ""Usuarios"" (
+                ""Id"" UUID PRIMARY KEY, ""EmpresaId"" UUID NOT NULL REFERENCES ""Empresas""(""Id""),
+                ""Nombre"" VARCHAR(200) NOT NULL, ""Email"" VARCHAR(200) NOT NULL UNIQUE,
+                ""PasswordHash"" VARCHAR(500) NOT NULL DEFAULT '', ""Rol"" TEXT NOT NULL,
+                ""Activo"" BOOLEAN DEFAULT TRUE, ""FechaRegistro"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""FechaActualizacion"" TIMESTAMPTZ);
+            CREATE TABLE IF NOT EXISTS ""Productos"" (
+                ""Id"" UUID PRIMARY KEY, ""EmpresaId"" UUID NOT NULL REFERENCES ""Empresas""(""Id""),
+                ""CodigoBarras"" VARCHAR(100) NOT NULL, ""Nombre"" VARCHAR(300) NOT NULL,
+                ""CostoPromedio"" DECIMAL(18,4) NOT NULL, ""PrecioVenta"" DECIMAL(18,4) NOT NULL,
+                ""StockActual"" DECIMAL(18,3) NOT NULL, ""StockMinimo"" DECIMAL(18,3) NOT NULL,
+                ""Ubicacion"" VARCHAR(200), ""ImagenUrl"" VARCHAR(500),
+                ""FechaRegistro"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""FechaActualizacion"" TIMESTAMPTZ,
+                UNIQUE(""EmpresaId"", ""CodigoBarras""));";
+        await cmd.ExecuteNonQueryAsync();
+        Console.WriteLine("[INFO] Tables ensured.");
+
+        // Ensure PasswordHash column exists
+        cmd.CommandText = @"ALTER TABLE ""Usuarios"" ADD COLUMN IF NOT EXISTS ""PasswordHash"" VARCHAR(500) NOT NULL DEFAULT ''";
+        await cmd.ExecuteNonQueryAsync();
+
+        // Fix empty PasswordHash
+        cmd.CommandText = "UPDATE \"Usuarios\" SET \"PasswordHash\" = @hash WHERE \"Email\" = @email AND (\"PasswordHash\" = '' OR \"PasswordHash\" IS NULL)";
+        var hasher = new PasswordHasherService();
+        cmd.Parameters.AddWithValue("@hash", hasher.Hash("admin123"));
+        cmd.Parameters.AddWithValue("@email", "admin@demo.com");
+        var updated = await cmd.ExecuteNonQueryAsync();
+        if (updated > 0) Console.WriteLine($"[INFO] Fixed {updated} admin password(s).");
+
+        // Full seed if no empresas
+        cmd.Parameters.Clear();
+        cmd.CommandText = "SELECT COUNT(*) FROM \"Empresas\"";
+        var empCount = (long)(await cmd.ExecuteScalarAsync())!;
+        if (empCount == 0)
         {
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE \"Usuarios\" ADD COLUMN IF NOT EXISTS \"PasswordHash\" character varying(500) NOT NULL DEFAULT ''");
-        }
-        catch { /* column already exists or other error */ }
+            Console.WriteLine("[INFO] Seeding fresh data...");
+            var empresaId = Guid.NewGuid();
+            cmd.Parameters.Clear();
+            cmd.CommandText = @"INSERT INTO ""Empresas"" (""Id"", ""Nombre"", ""NIT"") VALUES (@id, @nom, @nit)";
+            cmd.Parameters.AddWithValue("@id", empresaId);
+            cmd.Parameters.AddWithValue("@nom", "Demo Empresa");
+            cmd.Parameters.AddWithValue("@nit", "900000000-1");
+            await cmd.ExecuteNonQueryAsync();
 
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        await SeedDataAsync(db, hasher);
-        Console.WriteLine("[INFO] Seeding completed.");
+            cmd.Parameters.Clear();
+            cmd.CommandText = @"INSERT INTO ""Usuarios"" (""Id"", ""EmpresaId"", ""Nombre"", ""Email"", ""PasswordHash"", ""Rol"")
+                VALUES (@id, @eid, @nom, @mail, @hash, @rol)";
+            cmd.Parameters.AddWithValue("@id", Guid.NewGuid());
+            cmd.Parameters.AddWithValue("@eid", empresaId);
+            cmd.Parameters.AddWithValue("@nom", "Admin Demo");
+            cmd.Parameters.AddWithValue("@mail", "admin@demo.com");
+            cmd.Parameters.AddWithValue("@hash", hasher.Hash("admin123"));
+            cmd.Parameters.AddWithValue("@rol", "Administrador");
+            await cmd.ExecuteNonQueryAsync();
+
+            var productos = new (string Codigo, string Nombre, decimal Costo, decimal Precio, decimal Stock, decimal Min)[]
+            {
+                ("75010001", "Arroz Diana x1kg", 2800m, 3200m, 50m, 10m),
+                ("75010002", "Aceite Gourmet x900ml", 8500m, 9800m, 20m, 5m),
+                ("75010003", "Pan Bimbo Grande", 4200m, 5200m, 15m, 8m),
+                ("75010004", "Leche Colanta x1L", 3100m, 3800m, 30m, 12m),
+                ("75010005", "Huevos Santa Reyes x30", 12000m, 14500m, 10m, 3m),
+                ("75010006", "Jabón Ariel x500g", 4500m, 5600m, 25m, 6m),
+                ("75010007", "Coca-Cola x2L", 4200m, 5000m, 40m, 15m),
+                ("75010008", "Papel Higiénico x4", 3800m, 4800m, 18m, 5m),
+            };
+            foreach (var p in productos)
+            {
+                cmd.Parameters.Clear();
+                cmd.CommandText = @"INSERT INTO ""Productos"" (""Id"", ""EmpresaId"", ""CodigoBarras"", ""Nombre"", ""CostoPromedio"", ""PrecioVenta"", ""StockActual"", ""StockMinimo"")
+                    VALUES (@id, @eid, @cod, @nom, @cost, @precio, @stock, @min)";
+                cmd.Parameters.AddWithValue("@id", Guid.NewGuid());
+                cmd.Parameters.AddWithValue("@eid", empresaId);
+                cmd.Parameters.AddWithValue("@cod", p.Codigo);
+                cmd.Parameters.AddWithValue("@nom", p.Nombre);
+                cmd.Parameters.AddWithValue("@cost", p.Costo);
+                cmd.Parameters.AddWithValue("@precio", p.Precio);
+                cmd.Parameters.AddWithValue("@stock", p.Stock);
+                cmd.Parameters.AddWithValue("@min", p.Min);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            Console.WriteLine("[INFO] Seed completed.");
+        }
+        else
+        {
+            Console.WriteLine($"[INFO] Data exists ({empCount} empresas).");
+        }
     }
     catch (Exception ex)
     {
@@ -155,55 +237,3 @@ app.Lifetime.ApplicationStarted.Register(() =>
 });
 
 await app.RunAsync();
-
-static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwordHasher)
-{
-    if (!await db.Empresas.AnyAsync())
-    {
-        var empresa = new Empresa
-        {
-            Nombre = "Demo Empresa",
-            NIT = "900000000-1",
-            Activo = true
-        };
-        db.Empresas.Add(empresa);
-        await db.SaveChangesAsync();
-
-        var admin = new Usuario
-        {
-            EmpresaId = empresa.Id,
-            Nombre = "Admin Demo",
-            Email = "admin@demo.com",
-            PasswordHash = passwordHasher.Hash("admin123"),
-            Rol = RolUsuario.Administrador,
-            Activo = true
-        };
-        db.Usuarios.Add(admin);
-        await db.SaveChangesAsync();
-
-        var productos = new[]
-        {
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010001", Nombre = "Arroz Diana x1kg", CostoPromedio = 2800m, PrecioVenta = 3200m, StockActual = 50m, StockMinimo = 10m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010002", Nombre = "Aceite Gourmet x900ml", CostoPromedio = 8500m, PrecioVenta = 9800m, StockActual = 20m, StockMinimo = 5m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010003", Nombre = "Pan Bimbo Grande", CostoPromedio = 4200m, PrecioVenta = 5200m, StockActual = 15m, StockMinimo = 8m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010004", Nombre = "Leche Colanta x1L", CostoPromedio = 3100m, PrecioVenta = 3800m, StockActual = 30m, StockMinimo = 12m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010005", Nombre = "Huevos Santa Reyes x30", CostoPromedio = 12000m, PrecioVenta = 14500m, StockActual = 10m, StockMinimo = 3m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010006", Nombre = "Jabón Ariel x500g", CostoPromedio = 4500m, PrecioVenta = 5600m, StockActual = 25m, StockMinimo = 6m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010007", Nombre = "Coca-Cola x2L", CostoPromedio = 4200m, PrecioVenta = 5000m, StockActual = 40m, StockMinimo = 15m },
-            new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010008", Nombre = "Papel Higiénico x4", CostoPromedio = 3800m, PrecioVenta = 4800m, StockActual = 18m, StockMinimo = 5m },
-        };
-        db.Productos.AddRange(productos);
-        await db.SaveChangesAsync();
-        return;
-    }
-
-    // Fix existing admin user's PasswordHash
-    var admin = await db.Usuarios.IgnoreQueryFilters()
-        .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
-    if (admin != null && !passwordHasher.Verify("admin123", admin.PasswordHash))
-    {
-        var hash = passwordHasher.Hash("admin123");
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE \"Usuarios\" SET \"PasswordHash\" = {hash} WHERE \"Email\" = {"admin@demo.com"}");
-    }
-}

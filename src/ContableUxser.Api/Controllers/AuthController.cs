@@ -36,10 +36,10 @@ public class AuthController : ControllerBase
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.Activo);
 
         if (usuario == null)
-            return Unauthorized(BaseResponse<string>.Failure("Usuario no encontrado"));
+            return Unauthorized(BaseResponse<string>.Failure("Credenciales inválidas"));
 
         if (!_passwordHasher.Verify(request.Password, usuario.PasswordHash))
-            return Unauthorized(BaseResponse<string>.Failure("Contraseña incorrecta"));
+            return Unauthorized(BaseResponse<string>.Failure("Credenciales inválidas"));
 
         var token = _tokenService.GenerateToken(
             usuario.Id,
@@ -122,40 +122,6 @@ public class AuthController : ControllerBase
         }, "Empresa y administrador creados exitosamente"));
     }
 
-    [AllowAnonymous]
-    [HttpGet("debug")]
-    public async Task<IActionResult> Debug()
-    {
-        try
-        {
-            var admin = await _context.Usuarios.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
-            if (admin == null) return Ok(new { found = false });
-            var verify = _passwordHasher.Verify("admin123", admin.PasswordHash);
-            return Ok(new { found = true, email = admin.Email, hashLen = admin.PasswordHash.Length, verify });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { error = ex.Message });
-        }
-    }
-
-    [AllowAnonymous]
-    [HttpPost("debug/fix-password")]
-    public async Task<IActionResult> FixPassword()
-    {
-        try
-        {
-            var hash = _passwordHasher.Hash("admin123");
-            await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE \"Usuarios\" SET \"PasswordHash\" = {hash} WHERE \"Email\" = {"admin@demo.com"}");
-            return Ok(new { status = "ok" });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { status = "error", message = ex.Message });
-        }
-    }
 }
 
 public record LoginRequest(string Email, string Password);
