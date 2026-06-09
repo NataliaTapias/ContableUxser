@@ -197,13 +197,13 @@ static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwor
         return;
     }
 
-    // Fix existing users with empty PasswordHash
-    var admins = await db.Usuarios.IgnoreQueryFilters()
-        .Where(u => u.Email == "admin@demo.com" && (u.PasswordHash == "" || u.PasswordHash == null))
-        .ToListAsync();
-    foreach (var u in admins)
+    // Fix existing admin user's PasswordHash
+    var admin = await db.Usuarios.IgnoreQueryFilters()
+        .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
+    if (admin != null && !passwordHasher.Verify("admin123", admin.PasswordHash))
     {
-        u.PasswordHash = passwordHasher.Hash("admin123");
+        await db.Database.ExecuteSqlRawAsync(
+            "UPDATE \"Usuarios\" SET \"PasswordHash\" = {0} WHERE \"Email\" = {1}",
+            passwordHasher.Hash("admin123"), "admin@demo.com");
     }
-    await db.SaveChangesAsync();
 }
