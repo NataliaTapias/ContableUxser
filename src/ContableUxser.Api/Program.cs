@@ -157,36 +157,38 @@ static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwor
 {
     if (await db.Empresas.AnyAsync()) return;
 
-    var empresaId = Guid.NewGuid();
-    var adminId = Guid.NewGuid();
-    var adminPasswordHash = passwordHasher.Hash("admin123");
+    var empresa = new Empresa
+    {
+        Nombre = "Demo Empresa",
+        NIT = "900000000-1",
+        Activo = true
+    };
+    db.Empresas.Add(empresa);
+    await db.SaveChangesAsync();
 
-    using var tx = await db.Database.BeginTransactionAsync();
-    await db.Database.ExecuteSqlRawAsync(
-        "INSERT INTO \"Empresas\" (\"Id\", \"Nombre\", \"NIT\", \"Activo\", \"FechaRegistro\") VALUES ({0}, {1}, {2}, TRUE, NOW())",
-        empresaId, "Demo Empresa", "900000000-1");
-    await db.Database.ExecuteSqlRawAsync(
-        "INSERT INTO \"Usuarios\" (\"Id\", \"EmpresaId\", \"Nombre\", \"Email\", \"PasswordHash\", \"Rol\", \"Activo\", \"FechaRegistro\") VALUES ({0}, {1}, {2}, {3}, {4}, {5}, TRUE, NOW())",
-        adminId, empresaId, "Admin Demo", "admin@demo.com", adminPasswordHash, "Administrador");
+    var admin = new Usuario
+    {
+        EmpresaId = empresa.Id,
+        Nombre = "Admin Demo",
+        Email = "admin@demo.com",
+        PasswordHash = passwordHasher.Hash("admin123"),
+        Rol = RolUsuario.Administrador,
+        Activo = true
+    };
+    db.Usuarios.Add(admin);
+    await db.SaveChangesAsync();
 
     var productos = new[]
     {
-        ("75010001", "Arroz Diana x1kg", 2800m, 3200m, 50m, 10m),
-        ("75010002", "Aceite Gourmet x900ml", 8500m, 9800m, 20m, 5m),
-        ("75010003", "Pan Bimbo Grande", 4200m, 5200m, 15m, 8m),
-        ("75010004", "Leche Colanta x1L", 3100m, 3800m, 30m, 12m),
-        ("75010005", "Huevos Santa Reyes x30", 12000m, 14500m, 10m, 3m),
-        ("75010006", "Jabón Ariel x500g", 4500m, 5600m, 25m, 6m),
-        ("75010007", "Coca-Cola x2L", 4200m, 5000m, 40m, 15m),
-        ("75010008", "Papel Higiénico x4", 3800m, 4800m, 18m, 5m),
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010001", Nombre = "Arroz Diana x1kg", CostoPromedio = 2800m, PrecioVenta = 3200m, StockActual = 50m, StockMinimo = 10m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010002", Nombre = "Aceite Gourmet x900ml", CostoPromedio = 8500m, PrecioVenta = 9800m, StockActual = 20m, StockMinimo = 5m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010003", Nombre = "Pan Bimbo Grande", CostoPromedio = 4200m, PrecioVenta = 5200m, StockActual = 15m, StockMinimo = 8m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010004", Nombre = "Leche Colanta x1L", CostoPromedio = 3100m, PrecioVenta = 3800m, StockActual = 30m, StockMinimo = 12m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010005", Nombre = "Huevos Santa Reyes x30", CostoPromedio = 12000m, PrecioVenta = 14500m, StockActual = 10m, StockMinimo = 3m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010006", Nombre = "Jabón Ariel x500g", CostoPromedio = 4500m, PrecioVenta = 5600m, StockActual = 25m, StockMinimo = 6m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010007", Nombre = "Coca-Cola x2L", CostoPromedio = 4200m, PrecioVenta = 5000m, StockActual = 40m, StockMinimo = 15m },
+        new Producto { EmpresaId = empresa.Id, CodigoBarras = "75010008", Nombre = "Papel Higiénico x4", CostoPromedio = 3800m, PrecioVenta = 4800m, StockActual = 18m, StockMinimo = 5m },
     };
-
-    foreach (var (codigo, nombre, costo, precio, stock, min) in productos)
-    {
-        await db.Database.ExecuteSqlRawAsync(
-            "INSERT INTO \"Productos\" (\"Id\", \"EmpresaId\", \"CodigoBarras\", \"Nombre\", \"CostoPromedio\", \"PrecioVenta\", \"StockActual\", \"StockMinimo\", \"FechaRegistro\") VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, NOW())",
-            Guid.NewGuid(), empresaId, codigo, nombre, costo, precio, stock, min);
-    }
-
-    await tx.CommitAsync();
+    db.Productos.AddRange(productos);
+    await db.SaveChangesAsync();
 }
