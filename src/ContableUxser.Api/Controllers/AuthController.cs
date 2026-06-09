@@ -130,11 +130,13 @@ public class AuthController : ControllerBase
         {
             var admin = await _context.Usuarios.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
-            return Ok(new { found = admin != null, email = admin?.Email });
+            if (admin == null) return Ok(new { found = false });
+            var verify = _passwordHasher.Verify("admin123", admin.PasswordHash);
+            return Ok(new { found = true, email = admin.Email, hash = admin.PasswordHash, hashLen = admin.PasswordHash.Length, verify });
         }
         catch (Exception ex)
         {
-            return Ok(new { error = ex.Message });
+            return Ok(new { error = ex.Message, stack = ex.ToString() });
         }
     }
 
