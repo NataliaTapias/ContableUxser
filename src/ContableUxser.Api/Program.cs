@@ -116,17 +116,24 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     if (!builder.Configuration.GetValue<bool>("RUN_MIGRATIONS")) return;
 
     await Task.Delay(1000);
-    Console.WriteLine("[INFO] Starting database setup (EnsureCreated + seed)...");
+    Console.WriteLine("[INFO] Starting database setup...");
 
     try
     {
         using var scope = app.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var created = await dbContext.Database.EnsureCreatedAsync();
-        Console.WriteLine($"[INFO] Database created: {created}");
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.EnsureCreatedAsync();
 
-        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        await SeedDataAsync(dbContext, passwordHasher);
+        // Fix missing PasswordHash column from failed migration
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE \"Usuarios\" ADD COLUMN IF NOT EXISTS \"PasswordHash\" character varying(500) NOT NULL DEFAULT ''");
+        }
+        catch { /* column already exists or other error */ }
+
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await SeedDataAsync(db, hasher);
         Console.WriteLine("[INFO] Seeding completed.");
     }
     catch (Exception ex)
