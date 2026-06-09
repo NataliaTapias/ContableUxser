@@ -120,7 +120,7 @@ if (builder.Configuration.GetValue<bool>("RUN_MIGRATIONS"))
     await SeedDataAsync(dbContext, passwordHasher);
 }
 
-var port = app.Urls.FirstOrDefault()?.Port ?? 8080;
+var port = Uri.TryCreate(app.Urls.FirstOrDefault(), UriKind.Absolute, out var uri) ? uri.Port : 8080;
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     Console.WriteLine($@"╔══════════════════════════════════════════╗");
