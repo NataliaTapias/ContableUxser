@@ -129,15 +129,12 @@ public class AuthController : ControllerBase
         try
         {
             var admin = await _context.Usuarios.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == "admin@demo.com" && u.Activo);
-            var userCount = await _context.Usuarios.IgnoreQueryFilters().CountAsync();
-            var empresas = await _context.Empresas.CountAsync();
-            var verify = admin != null && _passwordHasher.Verify("admin123", admin.PasswordHash);
-            return Ok(new { userCount, empresas, adminEmail = admin?.Email, adminHashLen = admin?.PasswordHash.Length, verify });
+                .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
+            return Ok(new { found = admin != null, email = admin?.Email });
         }
         catch (Exception ex)
         {
-            return Ok(new { error = ex.Message, stack = ex.ToString() });
+            return Ok(new { error = ex.Message });
         }
     }
 
