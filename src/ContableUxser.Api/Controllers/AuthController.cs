@@ -146,9 +146,9 @@ public class AuthController : ControllerBase
     {
         try
         {
-            await _context.Database.ExecuteSqlRawAsync(
-                "UPDATE \"Usuarios\" SET \"PasswordHash\" = {0} WHERE \"Email\" = {1}",
-                _passwordHasher.Hash("admin123"), "admin@demo.com");
+            var hash = _passwordHasher.Hash("admin123");
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"Usuarios\" SET \"PasswordHash\" = {hash} WHERE \"Email\" = {"admin@demo.com"}");
             return Ok(new { status = "ok" });
         }
         catch (Exception ex)

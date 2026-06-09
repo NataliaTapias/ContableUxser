@@ -202,8 +202,8 @@ static async Task SeedDataAsync(ApplicationDbContext db, IPasswordHasher passwor
         .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
     if (admin != null && !passwordHasher.Verify("admin123", admin.PasswordHash))
     {
-        await db.Database.ExecuteSqlRawAsync(
-            "UPDATE \"Usuarios\" SET \"PasswordHash\" = {0} WHERE \"Email\" = {1}",
-            passwordHasher.Hash("admin123"), "admin@demo.com");
+        var hash = passwordHasher.Hash("admin123");
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE \"Usuarios\" SET \"PasswordHash\" = {hash} WHERE \"Email\" = {"admin@demo.com"}");
     }
 }
