@@ -110,21 +110,26 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// ── Apply migrations on startup (opt-in) ────────────────────────────
+// ── Apply migrations on startup (fire-and-forget) ───────────────────
 if (builder.Configuration.GetValue<bool>("RUN_MIGRATIONS"))
 {
-    try
+    _ = Task.Run(async () =>
     {
-        using var scope = app.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await dbContext.Database.MigrateAsync();
-        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        await SeedDataAsync(dbContext, passwordHasher);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"[WARN] Migration failed: {ex.Message}");
-    }
+        try
+        {
+            await Task.Delay(3000);
+            using var scope = app.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await dbContext.Database.MigrateAsync();
+            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            await SeedDataAsync(dbContext, passwordHasher);
+            Console.WriteLine("[INFO] Migration and seeding completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WARN] Migration failed: {ex.Message}");
+        }
+    });
 }
 
 var port = Uri.TryCreate(app.Urls.FirstOrDefault(), UriKind.Absolute, out var uri) ? uri.Port : 8080;
