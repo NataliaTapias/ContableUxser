@@ -21,6 +21,7 @@ public static class DependencyInjection
                 {
                     npgsqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
                     npgsqlOptions.EnableRetryOnFailure(3);
+                    npgsqlOptions.CommandTimeout(120);
                 }));
 
         services.AddScoped<IApplicationDbContext>(provider =>
