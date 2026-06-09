@@ -113,11 +113,18 @@ app.MapControllers();
 // ── Apply migrations on startup (opt-in) ────────────────────────────
 if (builder.Configuration.GetValue<bool>("RUN_MIGRATIONS"))
 {
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.MigrateAsync();
-    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-    await SeedDataAsync(dbContext, passwordHasher);
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await SeedDataAsync(dbContext, passwordHasher);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[WARN] Migration failed: {ex.Message}");
+    }
 }
 
 var port = Uri.TryCreate(app.Urls.FirstOrDefault(), UriKind.Absolute, out var uri) ? uri.Port : 8080;
