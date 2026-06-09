@@ -108,6 +108,22 @@ if (showSwagger)
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/api/health", async (ApplicationDbContext db) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        var empresaCount = await db.Empresas.CountAsync();
+        var usuarioCount = await db.Usuarios.IgnoreQueryFilters().CountAsync();
+        return Results.Ok(new { status = "ok", canConnect, empresaCount, usuarioCount, environment = builder.Environment.EnvironmentName });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { status = "error", message = ex.Message });
+    }
+});
+
 app.MapControllers();
 
 // ── Apply migrations on startup (after app is listening) ───────────
