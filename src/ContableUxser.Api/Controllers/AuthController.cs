@@ -36,10 +36,10 @@ public class AuthController : ControllerBase
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.Activo);
 
         if (usuario == null)
-            return Unauthorized(BaseResponse<string>.Failure("Credenciales inválidas"));
+            return Unauthorized(BaseResponse<string>.Failure("Usuario no encontrado"));
 
         if (!_passwordHasher.Verify(request.Password, usuario.PasswordHash))
-            return Unauthorized(BaseResponse<string>.Failure("Credenciales inválidas"));
+            return Unauthorized(BaseResponse<string>.Failure("Contraseña incorrecta"));
 
         var token = _tokenService.GenerateToken(
             usuario.Id,

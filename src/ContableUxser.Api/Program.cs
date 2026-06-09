@@ -116,7 +116,9 @@ app.MapGet("/api/health", async (ApplicationDbContext db) =>
         var canConnect = await db.Database.CanConnectAsync();
         var empresaCount = await db.Empresas.CountAsync();
         var usuarioCount = await db.Usuarios.IgnoreQueryFilters().CountAsync();
-        return Results.Ok(new { status = "ok", canConnect, empresaCount, usuarioCount, environment = builder.Environment.EnvironmentName });
+        var usuarios = await db.Usuarios.IgnoreQueryFilters()
+            .Select(u => new { u.Email, u.Nombre }).ToListAsync();
+        return Results.Ok(new { status = "ok", canConnect, empresaCount, usuarioCount, usuarios, environment = builder.Environment.EnvironmentName });
     }
     catch (Exception ex)
     {
