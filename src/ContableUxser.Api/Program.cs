@@ -109,42 +109,7 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/api/health", async (ApplicationDbContext db) =>
-{
-    try
-    {
-        var canConnect = await db.Database.CanConnectAsync();
-        var empresaCount = await db.Empresas.CountAsync();
-        var usuarioCount = await db.Usuarios.IgnoreQueryFilters().CountAsync();
-        var usuarios = await db.Usuarios.IgnoreQueryFilters()
-            .Select(u => new { u.Email, u.Nombre, HashLen = u.PasswordHash.Length }).ToListAsync();
-        return Results.Ok(new { status = "ok", canConnect, empresaCount, usuarioCount, usuarios, environment = builder.Environment.EnvironmentName });
-    }
-    catch (Exception ex)
-    {
-        return Results.Ok(new { status = "error", message = ex.Message });
-    }
-});
 
-app.MapPost("/api/debug/force-seed", async (ApplicationDbContext db, IPasswordHasher ph) =>
-{
-    try
-    {
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"VentaDetalles\"");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"Ventas\"");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"MovimientosInventario\"");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"SesionesCaja\"");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"Productos\"");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"Usuarios\"");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM \"Empresas\"");
-        await SeedDataAsync(db, ph);
-        return Results.Ok(new { status = "ok", message = "Seed forced" });
-    }
-    catch (Exception ex)
-    {
-        return Results.Ok(new { status = "error", message = ex.Message });
-    }
-});
 
 app.MapControllers();
 

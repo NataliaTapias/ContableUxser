@@ -121,6 +121,67 @@ public class AuthController : ControllerBase
             UsuarioId = usuario.Id
         }, "Empresa y administrador creados exitosamente"));
     }
+
+    [AllowAnonymous]
+    [HttpGet("debug")]
+    public async Task<IActionResult> Debug()
+    {
+        try
+        {
+            var userCount = await _context.Usuarios.IgnoreQueryFilters().CountAsync();
+            var empresaCount = await _context.Empresas.CountAsync();
+            var users = await _context.Usuarios.IgnoreQueryFilters()
+                .Select(u => new { u.Email, u.Nombre, HashLen = u.PasswordHash.Length })
+                .ToListAsync();
+
+            var admin = await _context.Usuarios.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
+            var verify = admin != null && _passwordHasher.Verify("admin123", admin.PasswordHash);
+            return Ok(new { userCount, empresaCount, users, verify });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { error = ex.Message });
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("debug/force-seed")]
+    public async Task<IActionResult> ForceSeed([FromServices] IPasswordHasher passwordHasher)
+    {
+        try
+        {
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"VentaDetalles\"");
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Ventas\"");
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"MovimientosInventario\"");
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SesionesCaja\"");
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Productos\"");
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Usuarios\"");
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Empresas\"");
+
+            var empresa = new Empresa { Nombre = "Demo Empresa", NIT = "900000000-1", Activo = true };
+            _context.Empresas.Add(empresa);
+            await _context.SaveChangesAsync();
+
+            var admin = new Usuario
+            {
+                EmpresaId = empresa.Id,
+                Nombre = "Admin Demo",
+                Email = "admin@demo.com",
+                PasswordHash = passwordHasher.Hash("admin123"),
+                Rol = RolUsuario.Administrador,
+                Activo = true
+            };
+            _context.Usuarios.Add(admin);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { status = "ok", message = "Seed forced" });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { status = "error", message = ex.Message });
+        }
+    }
 }
 
 public record LoginRequest(string Email, string Password);
