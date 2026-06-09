@@ -110,27 +110,31 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// ── Apply migrations on startup (fire-and-forget) ───────────────────
-if (builder.Configuration.GetValue<bool>("RUN_MIGRATIONS"))
+// ── Apply migrations on startup (after app is listening) ───────────
+app.Lifetime.ApplicationStarted.Register(async () =>
 {
-    _ = Task.Run(async () =>
+    if (!builder.Configuration.GetValue<bool>("RUN_MIGRATIONS")) return;
+
+    await Task.Delay(2000);
+    Console.WriteLine("[INFO] Starting database migration...");
+
+    try
     {
-        try
-        {
-            await Task.Delay(3000);
-            using var scope = app.Services.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            await dbContext.Database.MigrateAsync();
-            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-            await SeedDataAsync(dbContext, passwordHasher);
-            Console.WriteLine("[INFO] Migration and seeding completed successfully.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[WARN] Migration failed: {ex.Message}");
-        }
-    });
-}
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync(CancellationToken.None);
+        Console.WriteLine("[INFO] Migration completed.");
+
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await SeedDataAsync(dbContext, passwordHasher);
+        Console.WriteLine("[INFO] Seeding completed.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[WARN] Migration failed: {ex.Message}");
+        Console.WriteLine($"[WARN] Stack: {ex.StackTrace}");
+    }
+});
 
 var port = Uri.TryCreate(app.Urls.FirstOrDefault(), UriKind.Absolute, out var uri) ? uri.Port : 8080;
 app.Lifetime.ApplicationStarted.Register(() =>
