@@ -1,15 +1,10 @@
 using System.Text;
 using ContableUxser.Application;
-using ContableUxser.Application.Interfaces;
-using ContableUxser.Domain.Entities;
-using ContableUxser.Domain.Enums;
-using ContableUxser.Domain.Interfaces;
 using ContableUxser.Infrastructure;
-using ContableUxser.Infrastructure.Data;
 using ContableUxser.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Npgsql;
 
