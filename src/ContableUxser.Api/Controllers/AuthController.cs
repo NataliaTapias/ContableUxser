@@ -124,25 +124,9 @@ public class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("debug")]
-    public async Task<IActionResult> Debug()
+    public IActionResult Debug()
     {
-        try
-        {
-            var userCount = await _context.Usuarios.IgnoreQueryFilters().CountAsync();
-            var empresaCount = await _context.Empresas.CountAsync();
-            var users = await _context.Usuarios.IgnoreQueryFilters()
-                .Select(u => new { u.Email, u.Nombre, HashLen = u.PasswordHash.Length })
-                .ToListAsync();
-
-            var admin = await _context.Usuarios.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == "admin@demo.com");
-            var verify = admin != null && _passwordHasher.Verify("admin123", admin.PasswordHash);
-            return Ok(new { userCount, empresaCount, users, verify });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { error = ex.Message });
-        }
+        return Ok(new { message = "debug works" });
     }
 
     [AllowAnonymous]
